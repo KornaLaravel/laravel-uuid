@@ -16,7 +16,7 @@
 	"require" : {
 		"php" : "^8.2",
 		"webpatser/uuid": "^1.2.1|dev-main",
-		"illuminate/support": "^11.0|^12.0"
+		"illuminate/support": "^11.0|^12.0|^13.0"
 	},
 	"repositories": [
 		{
@@ -27,7 +27,7 @@
     "require-dev" : {
 		"fakerphp/faker": "^1.24",
 		"phpunit/phpunit": "^11.0",
-		"illuminate/database": "^11.0"
+		"illuminate/database": "^11.0|^12.0|^13.0"
     },
 	"autoload" : {
 		"psr-4" : {

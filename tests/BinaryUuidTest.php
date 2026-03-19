@@ -7,6 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\TestCase;
 use Webpatser\LaravelUuid\BinaryUuidCast;
 use Webpatser\LaravelUuid\BinaryUuidMigrations;
 use Webpatser\LaravelUuid\HasBinaryUuids;
