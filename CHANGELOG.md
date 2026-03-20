@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [7.0.0] - 2026-03-20
+
+### Changed
+- **Laravel 13 Support**: Now requires Laravel 13.x exclusively
+- **PHP 8.5 Requirement**: Minimum PHP version bumped to 8.5
+- **UUID Package**: Requires `webpatser/uuid` ^2.0
+- **Test Framework**: Migrated entire test suite from PHPUnit to Pest 4
+- **Code Modernization**: Refactored `switch` statements to PHP `match` expressions in `BinaryUuidMigrations`
+- **Dev Dependencies**: Replaced PHPUnit with Pest PHP, added Pest plugin support
+
+### Removed
+- Dropped Laravel 11.x and 12.x support
+- Dropped PHP 8.2–8.4 support
+- Removed PHPUnit bootstrap file (`tests/bootstrap.php`)
+- Removed local path repository configuration from `composer.json`
+
 ## [6.2.0] - 2025-09-12
 
 ### Changed
@@ -92,6 +108,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Previous versions were standalone UUID implementations. See git history for details.
 
+[7.0.0]: https://github.com/webpatser/laravel-uuid/compare/v6.2.0...v7.0.0
+[6.2.0]: https://github.com/webpatser/laravel-uuid/compare/v6.1.0...v6.2.0
 [6.1.0]: https://github.com/webpatser/laravel-uuid/compare/v6.0.1...v6.1.0
 [6.0.1]: https://github.com/webpatser/laravel-uuid/compare/v6.0.0...v6.0.1
 [6.0.0]: https://github.com/webpatser/laravel-uuid/compare/v5.x...v6.0.0

@@ -2,147 +2,92 @@
 
 declare(strict_types=1);
 
-namespace Tests;
-
-use Illuminate\Database\Eloquent\Model;
-use PHPUnit\Framework\TestCase;
-use Webpatser\LaravelUuid\HasUuids;
 use Webpatser\Uuid\Uuid;
 
-class HasUuidsTraitTest extends TestCase
-{
-    private TestModel $model;
+beforeEach(function () {
+    $this->model = new TestModel;
+});
 
-    protected function setUp(): void
-    {
-        $this->model = new TestModel;
-    }
+it('generates v7 uuid as new unique id', function () {
+    $uuid = $this->model->newUniqueId();
 
-    public function test_new_unique_id_generates_v7_uuid(): void
-    {
-        $uuid = $this->model->newUniqueId();
+    expect($uuid)->toBeString()->toHaveLength(36)
+        ->and(Uuid::validate($uuid))->toBeTrue()
+        ->and(Uuid::import($uuid)->version)->toBe(7);
+});
 
-        $this->assertIsString($uuid);
-        $this->assertEquals(36, strlen($uuid));
-        $this->assertTrue(Uuid::validate($uuid));
-        $this->assertEquals(7, Uuid::import($uuid)->version);
-    }
+it('validates unique ids', function () {
+    expect($this->model->testIsValidUniqueId('550e8400-e29b-41d4-a716-446655440000'))->toBeTrue()
+        ->and($this->model->testIsValidUniqueId('not-a-uuid'))->toBeFalse();
+});
 
-    public function test_is_valid_unique_id(): void
-    {
-        $validUuid = '550e8400-e29b-41d4-a716-446655440000';
-        $invalidUuid = 'not-a-uuid';
+it('provides uuid helper methods', function () {
+    $randomUuid = $this->model->newRandomUuid();
+    expect(Uuid::import($randomUuid)->version)->toBe(4);
 
-        $this->assertTrue($this->model->testIsValidUniqueId($validUuid));
-        $this->assertFalse($this->model->testIsValidUniqueId($invalidUuid));
-    }
+    $orderedUuid = $this->model->newOrderedUuid();
+    expect(Uuid::import($orderedUuid)->version)->toBe(7);
 
-    public function test_helper_methods(): void
-    {
-        // Test random UUID helper
-        $randomUuid = $this->model->newRandomUuid();
-        $this->assertEquals(4, Uuid::import($randomUuid)->version);
+    $timeUuid = $this->model->newTimeBasedUuid();
+    expect(Uuid::import($timeUuid)->version)->toBe(1);
+});
 
-        // Test ordered UUID helper
-        $orderedUuid = $this->model->newOrderedUuid();
-        $this->assertEquals(7, Uuid::import($orderedUuid)->version);
+it('detects uuid version from model id', function () {
+    $this->model->id = Uuid::v4()->string;
+    expect($this->model->getUuidVersion())->toBe(4);
 
-        // Test time-based UUID helper
-        $timeUuid = $this->model->newTimeBasedUuid();
-        $this->assertEquals(1, Uuid::import($timeUuid)->version);
-    }
+    $this->model->id = Uuid::v7()->string;
+    expect($this->model->getUuidVersion())->toBe(7);
+});
 
-    public function test_get_uuid_version_with_valid_uuid(): void
-    {
-        // Set a valid UUID as the primary key
-        $this->model->id = Uuid::v4()->string;
-        $this->assertEquals(4, $this->model->getUuidVersion());
+it('returns null version for invalid uuid', function () {
+    $this->model->id = 'invalid-uuid';
+    expect($this->model->getUuidVersion())->toBeNull();
+});
 
-        $this->model->id = Uuid::v7()->string;
-        $this->assertEquals(7, $this->model->getUuidVersion());
-    }
+it('returns null version for null id', function () {
+    $this->model->id = null;
+    expect($this->model->getUuidVersion())->toBeNull();
+});
 
-    public function test_get_uuid_version_with_invalid_uuid(): void
-    {
-        $this->model->id = 'invalid-uuid';
-        $this->assertNull($this->model->getUuidVersion());
-    }
+it('detects ordered uuids', function () {
+    $this->model->id = Uuid::v7()->string;
+    expect($this->model->usesOrderedUuids())->toBeTrue();
 
-    public function test_get_uuid_version_with_null_id(): void
-    {
-        $this->model->id = null;
-        $this->assertNull($this->model->getUuidVersion());
-    }
+    $this->model->id = Uuid::v4()->string;
+    expect($this->model->usesOrderedUuids())->toBeFalse();
+});
 
-    public function test_uses_ordered_uuids(): void
-    {
-        // Test with V7 UUID (ordered)
-        $this->model->id = Uuid::v7()->string;
-        $this->assertTrue($this->model->usesOrderedUuids());
+it('extracts uuid timestamp from model', function () {
+    $this->model->id = Uuid::generate(1)->string;
+    expect($this->model->getUuidTimestamp())->toBeFloat();
 
-        // Test with V4 UUID (not ordered)
-        $this->model->id = Uuid::v4()->string;
-        $this->assertFalse($this->model->usesOrderedUuids());
-    }
+    $this->model->id = Uuid::v7()->string;
+    expect($this->model->getUuidTimestamp())->toBeFloat();
 
-    public function test_get_uuid_timestamp(): void
-    {
-        // Test with time-based UUID (V1)
-        $timeUuid = Uuid::generate(1);
-        $this->model->id = $timeUuid->string;
-        $this->assertIsFloat($this->model->getUuidTimestamp());
-        $this->assertNotNull($this->model->getUuidTimestamp());
+    $this->model->id = Uuid::v4()->string;
+    expect($this->model->getUuidTimestamp())->toBeNull();
+});
 
-        // Test with ordered UUID (V7)
-        $orderedUuid = Uuid::v7();
-        $this->model->id = $orderedUuid->string;
-        $this->assertIsFloat($this->model->getUuidTimestamp());
-        $this->assertNotNull($this->model->getUuidTimestamp());
+it('generates different uuids each time', function () {
+    $uuid1 = $this->model->newUniqueId();
+    $uuid2 = $this->model->newUniqueId();
 
-        // Test with random UUID (V4 - no timestamp)
-        $randomUuid = Uuid::v4();
-        $this->model->id = $randomUuid->string;
-        $this->assertNull($this->model->getUuidTimestamp());
-    }
+    expect($uuid1)->not->toBe($uuid2);
+});
 
-    public function test_generated_uuids_are_different(): void
-    {
-        $uuid1 = $this->model->newUniqueId();
-        $uuid2 = $this->model->newUniqueId();
+it('generates sortable ordered uuids', function () {
+    $uuids = [];
 
-        $this->assertNotEquals($uuid1, $uuid2);
-    }
-
-    public function test_ordered_uuids_are_sortable(): void
-    {
-        $uuids = [];
-
-        // Generate multiple UUIDs with small delays
-        for ($i = 0; $i < 5; $i++) {
-            if ($i > 0) {
-                usleep(1000); // 1ms delay
-            }
-            $uuids[] = $this->model->newOrderedUuid();
+    for ($i = 0; $i < 5; $i++) {
+        if ($i > 0) {
+            usleep(1000);
         }
-
-        $sortedUuids = $uuids;
-        sort($sortedUuids);
-
-        // V7 UUIDs should be naturally sortable
-        $this->assertEquals($uuids, $sortedUuids);
+        $uuids[] = $this->model->newOrderedUuid();
     }
-}
 
-// Test model class for testing the trait
-class TestModel extends Model
-{
-    use HasUuids;
+    $sortedUuids = $uuids;
+    sort($sortedUuids);
 
-    protected $table = 'test_models';
-
-    // Helper method to test protected method
-    public function testIsValidUniqueId($value): bool
-    {
-        return $this->isValidUniqueId($value);
-    }
-}
+    expect($uuids)->toBe($sortedUuids);
+});

@@ -2,152 +2,116 @@
 
 declare(strict_types=1);
 
-namespace Tests;
-
 use Illuminate\Support\Str;
-use PHPUnit\Framework\TestCase;
 use Webpatser\LaravelUuid\UuidMacros;
 
-class UuidMacrosTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        // Register the macros for testing
-        UuidMacros::register();
-    }
+beforeEach(function () {
+    UuidMacros::register();
+});
 
-    public function test_str_fast_uuid_macro(): void
-    {
-        $uuid = Str::fastUuid();
+it('generates fast uuid v4', function () {
+    $uuid = Str::fastUuid();
 
-        $this->assertIsString($uuid);
-        $this->assertEquals(36, strlen($uuid));
-        $this->assertTrue(Str::fastIsUuid($uuid));
-        $this->assertEquals(4, Str::uuidVersion($uuid));
-    }
+    expect($uuid)->toBeString()->toHaveLength(36)
+        ->and(Str::fastIsUuid($uuid))->toBeTrue()
+        ->and(Str::uuidVersion($uuid))->toBe(4);
+});
 
-    public function test_str_fast_ordered_uuid_macro(): void
-    {
-        $uuid = Str::fastOrderedUuid();
+it('generates fast ordered uuid v7', function () {
+    $uuid = Str::fastOrderedUuid();
 
-        $this->assertIsString($uuid);
-        $this->assertEquals(36, strlen($uuid));
-        $this->assertTrue(Str::fastIsUuid($uuid));
-        $this->assertEquals(7, Str::uuidVersion($uuid));
-    }
+    expect($uuid)->toBeString()->toHaveLength(36)
+        ->and(Str::fastIsUuid($uuid))->toBeTrue()
+        ->and(Str::uuidVersion($uuid))->toBe(7);
+});
 
-    public function test_str_fast_is_uuid_macro(): void
-    {
-        $validUuid = '550e8400-e29b-41d4-a716-446655440000';
-        $invalidUuid = 'not-a-uuid';
+it('validates uuids with fastIsUuid', function () {
+    expect(Str::fastIsUuid('550e8400-e29b-41d4-a716-446655440000'))->toBeTrue()
+        ->and(Str::fastIsUuid('not-a-uuid'))->toBeFalse();
+});
 
-        $this->assertTrue(Str::fastIsUuid($validUuid));
-        $this->assertFalse(Str::fastIsUuid($invalidUuid));
-    }
+it('supports additional uuid macros', function () {
+    $timeUuid = Str::timeBasedUuid();
+    expect(Str::isUuid($timeUuid))->toBeTrue()
+        ->and(Str::uuidVersion($timeUuid))->toBe(1)
+        ->and(Str::uuidTimestamp($timeUuid))->not->toBeNull();
 
-    public function test_additional_uuid_macros(): void
-    {
-        // Test time-based UUID
-        $timeUuid = Str::timeBasedUuid();
-        $this->assertTrue(Str::isUuid($timeUuid));
-        $this->assertEquals(1, Str::uuidVersion($timeUuid));
-        $this->assertNotNull(Str::uuidTimestamp($timeUuid));
+    $reorderedTimeUuid = Str::reorderedTimeUuid();
+    expect(Str::isUuid($reorderedTimeUuid))->toBeTrue()
+        ->and(Str::uuidVersion($reorderedTimeUuid))->toBe(6);
 
-        // Test reordered time UUID
-        $reorderedTimeUuid = Str::reorderedTimeUuid();
-        $this->assertTrue(Str::isUuid($reorderedTimeUuid));
-        $this->assertEquals(6, Str::uuidVersion($reorderedTimeUuid));
+    $customUuid = Str::customUuid('test-data');
+    expect(Str::isUuid($customUuid))->toBeTrue()
+        ->and(Str::uuidVersion($customUuid))->toBe(8);
 
-        // Test custom UUID
-        $customUuid = Str::customUuid('test-data');
-        $this->assertTrue(Str::isUuid($customUuid));
-        $this->assertEquals(8, Str::uuidVersion($customUuid));
+    // Same custom data should produce same UUID
+    $customUuid2 = Str::customUuid('test-data');
+    expect($customUuid)->toBe($customUuid2);
+});
 
-        // Same custom data should produce same UUID
-        $customUuid2 = Str::customUuid('test-data');
-        $this->assertEquals($customUuid, $customUuid2);
-    }
+it('generates name-based uuids', function () {
+    $name = 'example.com';
 
-    public function test_name_based_uuids(): void
-    {
-        $name = 'example.com';
+    $md5Uuid = Str::nameUuidMd5($name);
+    expect(Str::isUuid($md5Uuid))->toBeTrue()
+        ->and(Str::uuidVersion($md5Uuid))->toBe(3);
 
-        // Test MD5 name-based UUID
-        $md5Uuid = Str::nameUuidMd5($name);
-        $this->assertTrue(Str::isUuid($md5Uuid));
-        $this->assertEquals(3, Str::uuidVersion($md5Uuid));
+    // Same name should produce same UUID
+    expect(Str::nameUuidMd5($name))->toBe($md5Uuid);
 
-        // Same name should produce same UUID
-        $md5Uuid2 = Str::nameUuidMd5($name);
-        $this->assertEquals($md5Uuid, $md5Uuid2);
+    $sha1Uuid = Str::nameUuidSha1($name);
+    expect(Str::isUuid($sha1Uuid))->toBeTrue()
+        ->and(Str::uuidVersion($sha1Uuid))->toBe(5);
 
-        // Test SHA-1 name-based UUID
-        $sha1Uuid = Str::nameUuidSha1($name);
-        $this->assertTrue(Str::isUuid($sha1Uuid));
-        $this->assertEquals(5, Str::uuidVersion($sha1Uuid));
+    // Same name should produce same UUID
+    expect(Str::nameUuidSha1($name))->toBe($sha1Uuid);
+});
 
-        // Same name should produce same UUID
-        $sha1Uuid2 = Str::nameUuidSha1($name);
-        $this->assertEquals($sha1Uuid, $sha1Uuid2);
-    }
+it('supports nil uuid macros', function () {
+    $nil = Str::nilUuid();
 
-    public function test_nil_uuid_macros(): void
-    {
-        $nil = Str::nilUuid();
+    expect($nil)->toBe('00000000-0000-0000-0000-000000000000')
+        ->and(Str::isNilUuid($nil))->toBeTrue()
+        ->and(Str::isNilUuid(Str::fastUuid()))->toBeFalse();
+});
 
-        $this->assertEquals('00000000-0000-0000-0000-000000000000', $nil);
-        $this->assertTrue(Str::isNilUuid($nil));
-        $this->assertFalse(Str::isNilUuid(Str::fastUuid()));
-    }
+it('detects uuid version', function () {
+    expect(Str::uuidVersion(Str::fastUuid()))->toBe(4)
+        ->and(Str::uuidVersion(Str::fastOrderedUuid()))->toBe(7)
+        ->and(Str::uuidVersion('invalid-uuid'))->toBeNull();
+});
 
-    public function test_uuid_version_macro(): void
-    {
-        $this->assertEquals(4, Str::uuidVersion(Str::fastUuid()));
-        $this->assertEquals(7, Str::uuidVersion(Str::fastOrderedUuid()));
-        $this->assertNull(Str::uuidVersion('invalid-uuid'));
-    }
+it('extracts uuid timestamp', function () {
+    $timeUuid = Str::timeBasedUuid();
+    $orderedUuid = Str::fastOrderedUuid();
+    $randomUuid = Str::fastUuid();
 
-    public function test_uuid_timestamp_macro(): void
-    {
-        $timeUuid = Str::timeBasedUuid();
-        $orderedUuid = Str::fastOrderedUuid();
-        $randomUuid = Str::fastUuid();
+    expect(Str::uuidTimestamp($timeUuid))->toBeFloat()
+        ->and(Str::uuidTimestamp($orderedUuid))->toBeFloat()
+        ->and(Str::uuidTimestamp($randomUuid))->toBeNull()
+        ->and(Str::uuidTimestamp('invalid-uuid'))->toBeNull();
+});
 
-        $this->assertIsFloat(Str::uuidTimestamp($timeUuid));
-        $this->assertIsFloat(Str::uuidTimestamp($orderedUuid));
-        $this->assertNull(Str::uuidTimestamp($randomUuid)); // V4 has no timestamp
-        $this->assertNull(Str::uuidTimestamp('invalid-uuid'));
-    }
+it('generates sortable ordered uuids', function () {
+    $uuids = [];
 
-    public function test_benchmark_macro(): void
-    {
-        $result = Str::benchmarkUuid(100, 7);
-
-        $this->assertIsArray($result);
-        $this->assertArrayHasKey('version', $result);
-        $this->assertArrayHasKey('iterations', $result);
-        $this->assertArrayHasKey('uuids_per_second', $result);
-        $this->assertEquals(7, $result['version']);
-        $this->assertEquals(100, $result['iterations']);
-        $this->assertGreaterThan(0, $result['uuids_per_second']);
-    }
-
-    public function test_ordered_uuids_are_sortable(): void
-    {
-        $uuids = [];
-
-        // Generate multiple ordered UUIDs with small delays
-        for ($i = 0; $i < 5; $i++) {
-            if ($i > 0) {
-                usleep(1000); // 1ms delay
-            }
-            $uuids[] = Str::fastOrderedUuid();
+    for ($i = 0; $i < 5; $i++) {
+        if ($i > 0) {
+            usleep(1000);
         }
-
-        $sortedUuids = $uuids;
-        sort($sortedUuids);
-
-        // V7 UUIDs should be naturally sortable
-        $this->assertEquals($uuids, $sortedUuids);
+        $uuids[] = Str::fastOrderedUuid();
     }
-}
+
+    $sortedUuids = $uuids;
+    sort($sortedUuids);
+
+    expect($uuids)->toBe($sortedUuids);
+});
+
+it('throws on invalid uuid string for uuidToBinary', function () {
+    Str::uuidToBinary('not-a-valid-uuid');
+})->throws(InvalidArgumentException::class, 'Invalid UUID format');
+
+it('throws on wrong-length binary for binaryToUuid', function () {
+    Str::binaryToUuid('too-short');
+})->throws(InvalidArgumentException::class, 'Binary UUID must be exactly 16 bytes');

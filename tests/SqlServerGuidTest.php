@@ -2,192 +2,96 @@
 
 declare(strict_types=1);
 
-namespace Tests;
-
 use Illuminate\Support\Str;
-use PHPUnit\Framework\TestCase;
 use Webpatser\LaravelUuid\UuidMacros;
 use Webpatser\Uuid\Uuid;
 
-/**
- * Tests for SQL Server GUID byte order conversion
- *
- * Addresses GitHub issue #11 where SQL Server uniqueidentifier fields
- * have mixed endianness that causes byte order issues when importing.
- */
-class SqlServerGuidTest extends TestCase
-{
-    protected function setUp(): void
-    {
-        parent::setUp();
+beforeEach(function () {
+    UuidMacros::register();
+});
 
-        // Register macros for testing
-        UuidMacros::register();
+it('fixes github issue 11 sql server byte order', function () {
+    $sqlServerGuid = '825B076B-44EC-E511-80DC-00155D0ABC54';
+    $expectedStandardUuid = '6B075B82-EC44-11E5-80DC-00155D0ABC54';
+
+    $uuid = Uuid::importFromSqlServer($sqlServerGuid);
+    expect(strtoupper($uuid->string))->toBe($expectedStandardUuid);
+
+    $convertedUuid = Str::uuidFromSqlServer($sqlServerGuid);
+    expect(strtoupper($convertedUuid))->toBe($expectedStandardUuid);
+});
+
+it('supports round-trip conversion', function () {
+    $originalUuid = '6B075B82-EC44-11E5-80DC-00155D0ABC54';
+
+    $uuid = Uuid::import($originalUuid);
+    $sqlServerFormat = $uuid->toSqlServer();
+
+    expect($sqlServerFormat)->toBe('825B076B-44EC-E511-80DC-00155D0ABC54');
+
+    $backToStandard = Uuid::importFromSqlServer($sqlServerFormat);
+    expect(strtoupper($backToStandard->string))->toBe($originalUuid);
+});
+
+it('supports laravel macro round-trip', function () {
+    $originalUuid = '6B075B82-EC44-11E5-80DC-00155D0ABC54';
+
+    $sqlServerGuid = Str::uuidToSqlServer($originalUuid);
+    expect($sqlServerGuid)->toBe('825B076B-44EC-E511-80DC-00155D0ABC54');
+
+    $backToStandard = Str::uuidFromSqlServer($sqlServerGuid);
+    expect(strtoupper($backToStandard))->toBe($originalUuid);
+});
+
+it('handles binary conversion for sql server', function () {
+    $standardUuid = '6B075B82-EC44-11E5-80DC-00155D0ABC54';
+    $uuid = Uuid::import($standardUuid);
+
+    $sqlServerBinary = $uuid->toSqlServerBinary();
+    expect($sqlServerBinary)->toHaveLength(16);
+
+    $macroBinary = Str::uuidToSqlServerBinary($standardUuid);
+    expect($macroBinary)->toBe($sqlServerBinary);
+
+    $backToUuid = Str::sqlServerBinaryToUuid($sqlServerBinary);
+    expect(strtoupper($backToUuid))->toBe($standardUuid);
+});
+
+it('does not affect normal uuids', function () {
+    $normalUuid = (string) Uuid::v4();
+
+    $toSqlServer = Str::uuidToSqlServer($normalUuid);
+    $backToNormal = Str::uuidFromSqlServer($toSqlServer);
+
+    expect(strtoupper($backToNormal))->toBe(strtoupper($normalUuid))
+        ->and(Uuid::validate($toSqlServer))->toBeTrue()
+        ->and(Uuid::validate($backToNormal))->toBeTrue();
+});
+
+it('converts multiple uuid versions', function () {
+    $testUuids = [
+        (string) Uuid::generate(1),
+        (string) Uuid::v4(),
+        (string) Uuid::v7(),
+    ];
+
+    foreach ($testUuids as $original) {
+        $sqlServerFormat = Str::uuidToSqlServer($original);
+        $backToOriginal = Str::uuidFromSqlServer($sqlServerFormat);
+
+        expect(strtoupper($backToOriginal))->toBe(strtoupper($original))
+            ->and(Uuid::validate($sqlServerFormat))->toBeTrue();
     }
+});
 
-    /**
-     * Test the exact case from GitHub issue #11
-     *
-     * SQL Server UUID: 825B076B-44EC-E511-80DC-00155D0ABC54
-     * Expected PHP UUID: 6B075B82-EC44-11E5-80DC-00155D0ABC54 (corrected)
-     */
-    public function test_git_hub_issue11_sql_server_byte_order(): void
-    {
-        $sqlServerGuid = '825B076B-44EC-E511-80DC-00155D0ABC54';
-        $expectedStandardUuid = '6B075B82-EC44-11E5-80DC-00155D0ABC54';
+it('throws on invalid sql server guid', function () {
+    (void) Uuid::importFromSqlServer('invalid-guid');
+})->throws(Exception::class, 'Invalid SQL Server GUID format');
 
-        // Test core library method
-        $uuid = Uuid::importFromSqlServer($sqlServerGuid);
-        $this->assertEquals($expectedStandardUuid, strtoupper($uuid->string));
+it('throws on invalid uuid for sql server conversion', function () {
+    Str::uuidToSqlServer('invalid-uuid');
+})->throws(InvalidArgumentException::class, 'Invalid UUID format');
 
-        // Test Laravel macro
-        $convertedUuid = Str::uuidFromSqlServer($sqlServerGuid);
-        $this->assertEquals($expectedStandardUuid, strtoupper($convertedUuid));
-    }
-
-    /**
-     * Test round-trip conversion: Standard UUID -> SQL Server -> Standard UUID
-     */
-    public function test_round_trip_conversion(): void
-    {
-        $originalUuid = '6B075B82-EC44-11E5-80DC-00155D0ABC54';
-
-        // Convert to SQL Server format
-        $uuid = Uuid::import($originalUuid);
-        $sqlServerFormat = $uuid->toSqlServer();
-
-        // This should match the original SQL Server GUID from issue #11
-        $this->assertEquals('825B076B-44EC-E511-80DC-00155D0ABC54', $sqlServerFormat);
-
-        // Convert back to standard format
-        $backToStandard = Uuid::importFromSqlServer($sqlServerFormat);
-        $this->assertEquals($originalUuid, strtoupper($backToStandard->string));
-    }
-
-    /**
-     * Test Laravel macro round-trip conversion
-     */
-    public function test_laravel_macro_round_trip(): void
-    {
-        $originalUuid = '6B075B82-EC44-11E5-80DC-00155D0ABC54';
-
-        // Convert to SQL Server format using macro
-        $sqlServerGuid = Str::uuidToSqlServer($originalUuid);
-        $this->assertEquals('825B076B-44EC-E511-80DC-00155D0ABC54', $sqlServerGuid);
-
-        // Convert back using macro
-        $backToStandard = Str::uuidFromSqlServer($sqlServerGuid);
-        $this->assertEquals($originalUuid, strtoupper($backToStandard));
-    }
-
-    /**
-     * Test binary conversion for SQL Server
-     */
-    public function test_sql_server_binary_conversion(): void
-    {
-        $standardUuid = '6B075B82-EC44-11E5-80DC-00155D0ABC54';
-        $uuid = Uuid::import($standardUuid);
-
-        // Get SQL Server binary format
-        $sqlServerBinary = $uuid->toSqlServerBinary();
-        $this->assertEquals(16, strlen($sqlServerBinary));
-
-        // Test Laravel macro for binary conversion
-        $macroBinary = Str::uuidToSqlServerBinary($standardUuid);
-        $this->assertEquals($sqlServerBinary, $macroBinary);
-
-        // Test reverse conversion with macro
-        $backToUuid = Str::sqlServerBinaryToUuid($sqlServerBinary);
-        $this->assertEquals($standardUuid, strtoupper($backToUuid));
-    }
-
-    /**
-     * Test that normal UUIDs are not affected by SQL Server methods
-     */
-    public function test_normal_uuid_unaffected(): void
-    {
-        // Generate a normal UUID
-        $normalUuid = (string) Uuid::v4();
-
-        // Converting to SQL Server and back should be lossless
-        $toSqlServer = Str::uuidToSqlServer($normalUuid);
-        $backToNormal = Str::uuidFromSqlServer($toSqlServer);
-
-        $this->assertEquals(strtoupper($normalUuid), strtoupper($backToNormal));
-        $this->assertTrue(Uuid::validate($toSqlServer));
-        $this->assertTrue(Uuid::validate($backToNormal));
-    }
-
-    /**
-     * Test multiple UUID versions with SQL Server conversion
-     */
-    public function test_multiple_versions_with_sql_server(): void
-    {
-        $testUuids = [
-            (string) Uuid::generate(1),  // Time-based
-            (string) Uuid::v4(),         // Random
-            (string) Uuid::v7(),         // Time-ordered
-        ];
-
-        foreach ($testUuids as $original) {
-            $sqlServerFormat = Str::uuidToSqlServer($original);
-            $backToOriginal = Str::uuidFromSqlServer($sqlServerFormat);
-
-            $this->assertEquals(strtoupper($original), strtoupper($backToOriginal),
-                "Round-trip failed for UUID: {$original}");
-            $this->assertTrue(Uuid::validate($sqlServerFormat));
-        }
-    }
-
-    /**
-     * Test error handling for invalid input
-     */
-    public function test_error_handling(): void
-    {
-        // Test invalid SQL Server GUID
-        $this->expectException(\Exception::class);
-        $this->expectExceptionMessage('Invalid SQL Server GUID format');
-        Uuid::importFromSqlServer('invalid-guid');
-    }
-
-    /**
-     * Test Laravel macro error handling
-     */
-    public function test_laravel_macro_error_handling(): void
-    {
-        // Test invalid UUID for conversion to SQL Server
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid UUID format');
-        Str::uuidToSqlServer('invalid-uuid');
-    }
-
-    /**
-     * Test binary error handling
-     */
-    public function test_binary_error_handling(): void
-    {
-        // Test invalid binary length
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('SQL Server GUID binary must be exactly 16 bytes');
-        Str::sqlServerBinaryToUuid('too-short');
-    }
-
-    /**
-     * Demonstrate the fix for the original issue
-     */
-    public function test_original_issue_fix(): void
-    {
-        // This is the exact scenario from GitHub issue #11
-        $sqlServerGuid = '825B076B-44EC-E511-80DC-00155D0ABC54';
-
-        // Before fix: importing this would give wrong UUID
-        // After fix: importing this gives correct UUID
-        $correctedUuid = Uuid::importFromSqlServer($sqlServerGuid);
-
-        // Now App\Deployment::find($correctedUuid->string) should work
-        // because the byte order has been corrected
-        $this->assertTrue(Uuid::validate($correctedUuid->string));
-        $this->assertNotEquals($sqlServerGuid, $correctedUuid->string);
-        $this->assertEquals('6B075B82-EC44-11E5-80DC-00155D0ABC54', strtoupper($correctedUuid->string));
-    }
-}
+it('throws on invalid binary length', function () {
+    Str::sqlServerBinaryToUuid('too-short');
+})->throws(InvalidArgumentException::class, 'SQL Server GUID binary must be exactly 16 bytes');

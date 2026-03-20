@@ -38,31 +38,11 @@ class BinaryUuidMigrations
     {
         $driver = self::getDatabaseDriver();
 
-        switch ($driver) {
-            case 'mysql':
-            case 'mariadb':
-                $table->binary($column, 16)->primary();
-                break;
-
-            case 'pgsql':
-                // PostgreSQL has native UUID type, but we use bytea for binary storage
-                $table->addColumn('bytea', $column)->primary();
-                break;
-
-            case 'sqlite':
-                // SQLite stores everything as text, but we can still use BLOB
-                $table->binary($column, 16)->primary();
-                break;
-
-            case 'sqlsrv':
-                // SQL Server: Use uniqueidentifier for native GUID support
-                $table->addColumn('uniqueidentifier', $column)->primary();
-                break;
-
-            default:
-                // Fallback to standard binary
-                $table->binary($column, 16)->primary();
-        }
+        match ($driver) {
+            'pgsql' => $table->addColumn('bytea', $column)->primary(),
+            'sqlsrv' => $table->addColumn('uniqueidentifier', $column)->primary(),
+            default => $table->binary($column, 16)->primary(),
+        };
     }
 
     /**
@@ -80,27 +60,11 @@ class BinaryUuidMigrations
     ): void {
         $driver = self::getDatabaseDriver();
 
-        switch ($driver) {
-            case 'mysql':
-            case 'mariadb':
-                $col = $table->binary($column, 16);
-                break;
-
-            case 'pgsql':
-                $col = $table->addColumn('bytea', $column);
-                break;
-
-            case 'sqlite':
-                $col = $table->binary($column, 16);
-                break;
-
-            case 'sqlsrv':
-                $col = $table->addColumn('uniqueidentifier', $column);
-                break;
-
-            default:
-                $col = $table->binary($column, 16);
-        }
+        $col = match ($driver) {
+            'pgsql' => $table->addColumn('bytea', $column),
+            'sqlsrv' => $table->addColumn('uniqueidentifier', $column),
+            default => $table->binary($column, 16),
+        };
 
         if ($nullable) {
             $col->nullable();
@@ -126,27 +90,11 @@ class BinaryUuidMigrations
     ): void {
         $driver = self::getDatabaseDriver();
 
-        switch ($driver) {
-            case 'mysql':
-            case 'mariadb':
-                $col = $table->binary($column, 16);
-                break;
-
-            case 'pgsql':
-                $col = $table->addColumn('bytea', $column);
-                break;
-
-            case 'sqlite':
-                $col = $table->binary($column, 16);
-                break;
-
-            case 'sqlsrv':
-                $col = $table->addColumn('uniqueidentifier', $column);
-                break;
-
-            default:
-                $col = $table->binary($column, 16);
-        }
+        $col = match ($driver) {
+            'pgsql' => $table->addColumn('bytea', $column),
+            'sqlsrv' => $table->addColumn('uniqueidentifier', $column),
+            default => $table->binary($column, 16),
+        };
 
         if ($nullable) {
             $col->nullable();
@@ -190,23 +138,13 @@ class BinaryUuidMigrations
     {
         $driver = $driver ?? self::getDatabaseDriver();
 
-        switch ($driver) {
-            case 'mysql':
-            case 'mariadb':
-                return self::getMysqlConversionSql($table, $column);
-
-            case 'pgsql':
-                return self::getPostgresqlConversionSql($table, $column);
-
-            case 'sqlite':
-                return self::getSqliteConversionSql($table, $column);
-
-            case 'sqlsrv':
-                return self::getSqlServerConversionSql($table, $column);
-
-            default:
-                return self::getMysqlConversionSql($table, $column)."\n\n-- Note: This is MySQL syntax. Adjust for your database.";
-        }
+        return match ($driver) {
+            'mysql', 'mariadb' => self::getMysqlConversionSql($table, $column),
+            'pgsql' => self::getPostgresqlConversionSql($table, $column),
+            'sqlite' => self::getSqliteConversionSql($table, $column),
+            'sqlsrv' => self::getSqlServerConversionSql($table, $column),
+            default => self::getMysqlConversionSql($table, $column)."\n\n-- Note: This is MySQL syntax. Adjust for your database.",
+        };
     }
 
     /**
@@ -222,13 +160,13 @@ class BinaryUuidMigrations
 ALTER TABLE `{$table}` ADD COLUMN `{$column}_binary` BINARY(16) NULL AFTER `{$column}`;
 
 -- 2. Populate binary column from string column
-UPDATE `{$table}` 
-SET `{$column}_binary` = UNHEX(REPLACE(`{$column}`, '-', '')) 
+UPDATE `{$table}`
+SET `{$column}_binary` = UNHEX(REPLACE(`{$column}`, '-', ''))
 WHERE `{$column}` IS NOT NULL;
 
 -- 3. Verify conversion (should return 0)
-SELECT COUNT(*) FROM `{$table}` 
-WHERE `{$column}` IS NOT NULL 
+SELECT COUNT(*) FROM `{$table}`
+WHERE `{$column}` IS NOT NULL
 AND `{$column}_binary` IS NULL;
 
 -- 4. After updating your application code:
@@ -249,14 +187,14 @@ AND `{$column}_binary` IS NULL;
 -- 1. Add temporary bytea column
 ALTER TABLE \"{$table}\" ADD COLUMN \"{$column}_binary\" bytea;
 
--- 2. Populate binary column from string column  
-UPDATE \"{$table}\" 
+-- 2. Populate binary column from string column
+UPDATE \"{$table}\"
 SET \"{$column}_binary\" = decode(replace(\"{$column}\", '-', ''), 'hex')
 WHERE \"{$column}\" IS NOT NULL;
 
 -- 3. Verify conversion (should return 0)
-SELECT COUNT(*) FROM \"{$table}\" 
-WHERE \"{$column}\" IS NOT NULL 
+SELECT COUNT(*) FROM \"{$table}\"
+WHERE \"{$column}\" IS NOT NULL
 AND \"{$column}_binary\" IS NULL;
 
 -- 4. After updating your application code:
@@ -278,13 +216,13 @@ AND \"{$column}_binary\" IS NULL;
 ALTER TABLE `{$table}` ADD COLUMN `{$column}_binary` BLOB;
 
 -- 2. Populate binary column from string column
-UPDATE `{$table}` 
+UPDATE `{$table}`
 SET `{$column}_binary` = unhex(replace(`{$column}`, '-', ''))
 WHERE `{$column}` IS NOT NULL;
 
 -- 3. Verify conversion (should return 0)
-SELECT COUNT(*) FROM `{$table}` 
-WHERE `{$column}` IS NOT NULL 
+SELECT COUNT(*) FROM `{$table}`
+WHERE `{$column}` IS NOT NULL
 AND `{$column}_binary` IS NULL;
 
 -- 4. After updating your application code, recreate table:
@@ -309,13 +247,13 @@ AND `{$column}_binary` IS NULL;
 ALTER TABLE [{$table}] ADD [{$column}_guid] uniqueidentifier NULL;
 
 -- 2. Populate GUID column from string column using automatic conversion
-UPDATE [{$table}] 
+UPDATE [{$table}]
 SET [{$column}_guid] = CAST([{$column}] AS uniqueidentifier)
 WHERE [{$column}] IS NOT NULL;
 
 -- 3. Verify conversion (should return 0)
-SELECT COUNT(*) FROM [{$table}] 
-WHERE [{$column}] IS NOT NULL 
+SELECT COUNT(*) FROM [{$table}]
+WHERE [{$column}] IS NOT NULL
 AND [{$column}_guid] IS NULL;
 
 -- 4. After updating your application code to use SQL Server GUID methods:
@@ -338,61 +276,51 @@ AND [{$column}_guid] IS NULL;
     {
         $driver = $driver ?? self::getDatabaseDriver();
 
-        switch ($driver) {
-            case 'mysql':
-            case 'mariadb':
-                return [
-                    'driver' => $driver,
-                    'column_type' => 'BINARY(16)',
-                    'storage_bytes' => 16,
-                    'conversion_function' => 'UNHEX(REPLACE(uuid, "-", ""))',
-                    'reverse_function' => 'INSERT(INSERT(INSERT(INSERT(HEX(binary_uuid), 9, 0, "-"), 14, 0, "-"), 19, 0, "-"), 24, 0, "-")',
-                    'supports_native_uuid' => false,
-                ];
-
-            case 'pgsql':
-                return [
-                    'driver' => $driver,
-                    'column_type' => 'bytea',
-                    'storage_bytes' => 16,
-                    'conversion_function' => 'decode(replace(uuid, "-", ""), "hex")',
-                    'reverse_function' => 'encode(binary_uuid, "hex") with dashes inserted',
-                    'supports_native_uuid' => true,
-                    'note' => 'PostgreSQL has native UUID type, but bytea is used for binary storage',
-                ];
-
-            case 'sqlite':
-                return [
-                    'driver' => $driver,
-                    'column_type' => 'BLOB',
-                    'storage_bytes' => 16,
-                    'conversion_function' => 'unhex(replace(uuid, "-", ""))',
-                    'reverse_function' => 'hex(binary_uuid) with dashes inserted',
-                    'supports_native_uuid' => false,
-                ];
-
-            case 'sqlsrv':
-                return [
-                    'driver' => $driver,
-                    'column_type' => 'uniqueidentifier',
-                    'storage_bytes' => 16,
-                    'conversion_function' => 'CAST(uuid AS uniqueidentifier)',
-                    'reverse_function' => 'CAST(guid AS nvarchar(36))',
-                    'supports_native_uuid' => true,
-                    'supports_endianness_conversion' => true,
-                    'note' => 'SQL Server handles GUID endianness automatically. Use Laravel macros for cross-database compatibility.',
-                ];
-
-            default:
-                return [
-                    'driver' => $driver,
-                    'column_type' => 'BINARY(16)',
-                    'storage_bytes' => 16,
-                    'conversion_function' => 'Database-specific function needed',
-                    'reverse_function' => 'Database-specific function needed',
-                    'supports_native_uuid' => 'unknown',
-                ];
-        }
+        return match ($driver) {
+            'mysql', 'mariadb' => [
+                'driver' => $driver,
+                'column_type' => 'BINARY(16)',
+                'storage_bytes' => 16,
+                'conversion_function' => 'UNHEX(REPLACE(uuid, "-", ""))',
+                'reverse_function' => 'INSERT(INSERT(INSERT(INSERT(HEX(binary_uuid), 9, 0, "-"), 14, 0, "-"), 19, 0, "-"), 24, 0, "-")',
+                'supports_native_uuid' => false,
+            ],
+            'pgsql' => [
+                'driver' => $driver,
+                'column_type' => 'bytea',
+                'storage_bytes' => 16,
+                'conversion_function' => 'decode(replace(uuid, "-", ""), "hex")',
+                'reverse_function' => 'encode(binary_uuid, "hex") with dashes inserted',
+                'supports_native_uuid' => true,
+                'note' => 'PostgreSQL has native UUID type, but bytea is used for binary storage',
+            ],
+            'sqlite' => [
+                'driver' => $driver,
+                'column_type' => 'BLOB',
+                'storage_bytes' => 16,
+                'conversion_function' => 'unhex(replace(uuid, "-", ""))',
+                'reverse_function' => 'hex(binary_uuid) with dashes inserted',
+                'supports_native_uuid' => false,
+            ],
+            'sqlsrv' => [
+                'driver' => $driver,
+                'column_type' => 'uniqueidentifier',
+                'storage_bytes' => 16,
+                'conversion_function' => 'CAST(uuid AS uniqueidentifier)',
+                'reverse_function' => 'CAST(guid AS nvarchar(36))',
+                'supports_native_uuid' => true,
+                'supports_endianness_conversion' => true,
+                'note' => 'SQL Server handles GUID endianness automatically. Use Laravel macros for cross-database compatibility.',
+            ],
+            default => [
+                'driver' => $driver,
+                'column_type' => 'BINARY(16)',
+                'storage_bytes' => 16,
+                'conversion_function' => 'Database-specific function needed',
+                'reverse_function' => 'Database-specific function needed',
+                'supports_native_uuid' => 'unknown',
+            ],
+        };
     }
 
     /**
@@ -425,7 +353,7 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     * 
+     *
      * Binary UUID Storage Benefits:
      * - 55% smaller storage ({$dbInfo['storage_bytes']} bytes vs 36 chars)
      * - Faster database queries and indexing
@@ -437,8 +365,8 @@ return new class extends Migration
         Schema::create('{$table}', function (Blueprint \$table) {
             {$dbComment}
             BinaryUuidMigrations::addBinaryUuidPrimary(\$table);
-            
-{$additionalColumns}            
+
+{$additionalColumns}
             \$table->timestamps();
         });
     }

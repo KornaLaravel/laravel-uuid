@@ -2,7 +2,7 @@
 
 [![Total Downloads](https://img.shields.io/packagist/dt/webpatser/laravel-uuid.svg)](https://packagist.org/packages/webpatser/laravel-uuid)
 [![PHP Version](https://img.shields.io/packagist/php-v/webpatser/laravel-uuid.svg)](https://packagist.org/packages/webpatser/laravel-uuid)
-[![Laravel Version](https://img.shields.io/badge/laravel-^11.0%20%7C%20^12.0-red.svg)](https://packagist.org/packages/webpatser/laravel-uuid)
+[![Laravel Version](https://img.shields.io/badge/laravel-^13.0-red.svg)](https://packagist.org/packages/webpatser/laravel-uuid)
 [![License](https://img.shields.io/packagist/l/webpatser/laravel-uuid.svg)](https://packagist.org/packages/webpatser/laravel-uuid)
 
 Laravel package for generating and working with UUIDs. Automatic UUID model keys, validation rules, and Eloquent support.
@@ -13,7 +13,7 @@ Laravel package for generating and working with UUIDs. Automatic UUID model keys
 composer require webpatser/laravel-uuid
 ```
 
-**Requirements:** PHP 8.2+, Laravel 11.x or 12.x
+**Requirements:** PHP 8.5+, Laravel 13.x
 
 ## Quick Start
 
